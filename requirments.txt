@@ -1,0 +1,35 @@
+# ============================================
+# MINIMAL REQUIREMENTS
+# For quick setup - install only essentials
+# ============================================
+
+# Core Framework
+langchain==0.3.18
+langgraph==0.2.59
+
+# LLM Providers (choose one or both)
+langchain-openai==0.2.14
+langchain-anthropic==0.3.7
+langchain-groq==0.2.14
+
+# Vector Database
+qdrant-client==1.12.1
+
+# Web Search
+tavily-python==0.5.0
+
+# Document Processing
+pypdf==5.1.0
+beautifulsoup4==4.12.3
+requests==2.32.3
+
+# Configuration
+python-dotenv==1.0.1
+pydantic-settings==2.7.1
+
+# UI
+streamlit==1.41.1
+rich==13.9.4
+
+# Utilities
+tiktoken==0.8.0
