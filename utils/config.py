@@ -6,9 +6,14 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # API Keys
-    openai_api_key: str
-    anthropic_api_key: str
+    groq_api_key: str
     tavily_api_key: str
+    huggingface_api_key: str
+    
+    # LangSmith Monitoring
+    langchain_api_key: str
+    langchain_tracing_v2: bool = True
+    langchain_project: str = "multi-agent-research"
     
     # Optional Qdrant Cloud
     qdrant_url: str | None = None
@@ -17,16 +22,20 @@ class Settings(BaseSettings):
     # Project Settings
     project_name: str = "multi-agent-research"
     vector_db_collection: str = "research_documents"
-    embedding_model: str = "text-embedding-3-small"
-    llm_model: str = "claude-sonnet-4-20250514"
     
-    # Vector DB Settings
-    vector_dimension: int = 1536
+    # Embedding Model (BGE is excellent for research/RAG)
+    embedding_model: str = "BAAI/bge-base-en-v1.5"
+    vector_dimension: int = 768  # BGE-base dimension
+    
+    # LLM Model (Groq)
+    llm_model: str = "llama-3.3-70b-versatile"
+    
+    # Chunking Settings
     chunk_size: int = 1000
     chunk_overlap: int = 200
     
     # Search Settings
-    max_search_results: int = 5
+    max_search_results: int = 20
     num_search_queries: int = 5
     
     class Config:

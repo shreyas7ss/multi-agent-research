@@ -1,35 +1,40 @@
 # ============================================
-# MINIMAL REQUIREMENTS
-# For quick setup - install only essentials
+# MULTI-AGENT RESEARCH ASSISTANT REQUIREMENTS
 # ============================================
 
 # Core Framework
-langchain==0.3.18
-langgraph==0.2.59
+langchain>=0.3.0
+langgraph>=0.2.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
 
-# LLM Providers (choose one or both)
-langchain-openai==0.2.14
-langchain-anthropic==0.3.7
-langchain-groq==0.2.14
+# LLM Providers
+langchain-groq>=0.2.0
 
 # Vector Database
-qdrant-client==1.12.1
+qdrant-client>=1.12.0
+langchain-qdrant>=0.2.0
+
+# Embeddings (free, runs locally)
+langchain-huggingface>=0.1.0
+sentence-transformers>=2.2.0
 
 # Web Search
-tavily-python==0.5.0
+tavily-python>=0.5.0
 
 # Document Processing
-pypdf==5.1.0
-beautifulsoup4==4.12.3
-requests==2.32.3
+pypdf>=5.0.0
+beautifulsoup4>=4.12.0
+requests>=2.32.0
+lxml>=4.9.0
 
 # Configuration
-python-dotenv==1.0.1
-pydantic-settings==2.7.1
+python-dotenv>=1.0.0
+pydantic-settings>=2.0.0
 
 # UI
-streamlit==1.41.1
-rich==13.9.4
+streamlit>=1.41.0
+rich>=13.0.0
 
 # Utilities
-tiktoken==0.8.0
+tiktoken>=0.8.0

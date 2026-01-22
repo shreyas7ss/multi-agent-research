@@ -60,6 +60,7 @@ A PhD-level autonomous research assistant powered by multiple AI agents working 
 | **UI** | Streamlit |
 | **Package Manager** | UV |
 | **Terminal Output** | Rich |
+| **Monitoring** | LangSmith |
 
 ---
 
@@ -245,3 +246,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 <p align="center">
   Built with ❤️ for advanced AI research
 </p>
+
