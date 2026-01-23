@@ -3,14 +3,9 @@
 LangGraph Workflow - Orchestrates the multi-agent research pipeline.
 
 Flow:
-    START → Search → Analyzer → Synthesis → END
-    
-Future Flow (with all agents):
-    START → Clarification → Search → Analyzer → Synthesis → Reflection → END
-                                                              ↓
-                                                        (if needs revision)
-                                                              ↓
-                                                        Back to Synthesis
+    START → Search → Analyzer → Synthesis → Reflection → END
+                                     ↑          │
+                                     └──────────┘ (if needs revision)
 """
 
 from langgraph.graph import StateGraph, START, END
@@ -23,6 +18,7 @@ from graph.state import ResearchState
 from agents.search import WebSearchAgent
 from agents.analyzer import DocumentAnalyzer
 from agents.synthesis import SynthesisAgent
+from agents.reflection import ReflectionAgent
 from utils.logger import get_logger
 
 console = Console()
@@ -33,6 +29,7 @@ logger = get_logger("workflow")
 search_agent = WebSearchAgent()
 analyzer_agent = DocumentAnalyzer()
 synthesis_agent = SynthesisAgent()
+reflection_agent = ReflectionAgent()
 
 
 def search_node(state: ResearchState) -> ResearchState:
@@ -46,7 +43,6 @@ def analyzer_node(state: ResearchState) -> ResearchState:
     logger.info("Executing Analyzer Node")
     
     # Convert sources to the format analyzer expects
-    # Analyzer will process all sources found by search
     if state.sources and not state.approved_sources:
         # Auto-approve all sources for now (HITL can be added later)
         state.approved_sources = state.sources
@@ -60,18 +56,23 @@ def synthesis_node(state: ResearchState) -> ResearchState:
     return synthesis_agent.run(state)
 
 
-def should_continue(state: ResearchState) -> Literal["continue", "end"]:
+def reflection_node(state: ResearchState) -> ResearchState:
+    """Reflection node - evaluates report quality."""
+    logger.info("Executing Reflection Node")
+    return reflection_agent.run(state)
+
+
+def should_revise(state: ResearchState) -> Literal["revise", "end"]:
     """
-    Conditional edge: decide whether to continue or end.
-    Currently always ends, but can be extended for reflection loop.
+    Conditional edge: decide whether to revise or end.
     """
     if state.error:
         logger.warning(f"Workflow ending due to error: {state.error}")
         return "end"
     
-    # Future: Check reflection agent's quality score
-    # if state.needs_revision and state.iteration_count < state.max_iterations:
-    #     return "revise"
+    if state.needs_revision and state.iteration_count < state.max_iterations:
+        logger.info(f"Report needs revision (iteration {state.iteration_count})")
+        return "revise"
     
     return "end"
 
@@ -80,7 +81,7 @@ def build_research_graph() -> StateGraph:
     """
     Build and return the research workflow graph.
     
-    Current flow: Search → Analyze → Synthesize
+    Flow: Search → Analyze → Synthesize → Reflect → (Revise or End)
     """
     logger.info("Building research workflow graph")
     
@@ -91,14 +92,25 @@ def build_research_graph() -> StateGraph:
     graph.add_node("search", search_node)
     graph.add_node("analyzer", analyzer_node)
     graph.add_node("synthesis", synthesis_node)
+    graph.add_node("reflection", reflection_node)
     
-    # Add edges (linear flow for now)
+    # Add edges
     graph.add_edge(START, "search")
     graph.add_edge("search", "analyzer")
     graph.add_edge("analyzer", "synthesis")
-    graph.add_edge("synthesis", END)
+    graph.add_edge("synthesis", "reflection")
     
-    logger.info("Research graph built successfully")
+    # Conditional edge from reflection
+    graph.add_conditional_edges(
+        "reflection",
+        should_revise,
+        {
+            "revise": "synthesis",  # Go back to synthesis with feedback
+            "end": END
+        }
+    )
+    
+    logger.info("Research graph built with reflection loop")
     return graph
 
 
@@ -168,11 +180,13 @@ def run_research(query: str, thread_id: str = "default") -> ResearchState:
         console.print(f"📊 Sources found: {len(final_state.sources)}")
         console.print(f"📚 Chunks stored: {final_state.chunks_stored}")
         console.print(f"📄 Report length: {len(final_state.draft_report)} characters")
+        console.print(f"⭐ Quality score: {final_state.quality_score}/10")
+        console.print(f"🔄 Iterations: {final_state.iteration_count}")
         
         if final_state.error:
             console.print(f"[red]⚠️ Error: {final_state.error}[/red]")
         
-        logger.info(f"Research complete. Report: {len(final_state.draft_report)} chars")
+        logger.info(f"Research complete. Score: {final_state.quality_score}, Iterations: {final_state.iteration_count}")
         
         return final_state
         
@@ -185,7 +199,6 @@ def run_research(query: str, thread_id: str = "default") -> ResearchState:
 def get_graph_visualization():
     """
     Get a Mermaid diagram representation of the graph.
-    Useful for documentation.
     """
     return """
 ```mermaid
@@ -193,11 +206,9 @@ graph TD
     START((Start)) --> search[🔍 Search Agent]
     search --> analyzer[📄 Analyzer Agent]
     analyzer --> synthesis[📝 Synthesis Agent]
-    synthesis --> END((End))
-    
-    search -->|"Finds 20+ sources"| analyzer
-    analyzer -->|"Chunks & stores"| synthesis
-    synthesis -->|"Generates report"| END
+    synthesis --> reflection[🔍 Reflection Agent]
+    reflection -->|Quality OK| END((End))
+    reflection -->|Needs Revision| synthesis
 ```
 """
 
