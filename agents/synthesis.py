@@ -6,7 +6,7 @@ Responsibilities:
 - Retrieve relevant chunks from vector database
 - Synthesize information from diverse sources
 - Generate structured reports with proper citations
-- Include critical analysis distinguishing hype from reality
+- Include critical analysis, comparison tables, and practical examples
 """
 
 from langchain_groq import ChatGroq
@@ -29,7 +29,7 @@ settings = get_settings()
 logger = get_agent_logger("synthesis")
 
 
-# Enhanced synthesis prompt with critical analysis requirements
+# Enhanced synthesis prompt with feedback improvements
 SYNTHESIS_PROMPT = """You are a PhD-level research analyst tasked with synthesizing information into a comprehensive, CRITICALLY ANALYZED research report.
 
 ## Research Query
@@ -46,52 +46,71 @@ Generate a research report with the following sections:
 - High-level overview of key findings
 - Main insights and conclusions
 - Brief mention of limitations or debates
+- **IMPORTANT**: Prioritize findings from 2024-2026 sources
 
 ### 2. Key Findings (5-7 bullet points)
 - Each finding must have a citation [1], [2], etc.
 - Distinguish between established facts and emerging claims
 - Note level of evidence (demonstrated vs. theoretical)
+- **Prioritize the MOST RECENT developments** (2024-2026)
 
-### 3. Detailed Analysis
+### 3. Comparison Table
+Create a markdown table comparing key elements. Example format:
+| Aspect | Traditional Approach | Modern Approach | Source |
+|--------|---------------------|-----------------|--------|
+| Speed | X | Y | [1] |
+| Cost | X | Y | [2] |
+
+Choose aspects relevant to the research query (could be: technologies, companies, methods, timeframes, etc.)
+
+### 4. Detailed Analysis
 Synthesize information across sources while:
 - **Noting conflicting viewpoints**: "While Source A claims X, Source B argues Y..."
 - **Distinguishing hype from reality**: "Despite optimistic claims, actual deployment remains limited..."
-- **Identifying consensus vs. debate**: "Researchers broadly agree on X, but opinions differ on Y..."
-- **Providing temporal context**: Use phrases like "As of 2024" or "In recent years"
+- **Including SPECIFIC EXAMPLES**: Name specific companies, products, research papers, or implementations
+- **Providing temporal context**: Use current year context (it is now {current_year})
 
-### 4. Recent Developments
-- Focus on developments from the past 2 years
-- Include dates when available (e.g., "In March 2024...")
+### 5. Practical Applications & Real-World Examples
+- List 3-5 SPECIFIC real-world applications or case studies
+- Include company names, project names, or research institutions
+- Note the scale of deployment (pilot, commercial, research)
+- Example format: "IBM's Quantum Network has deployed X in Y sector, achieving Z results [Source]"
+
+### 6. Recent Developments (2024-2026)
+- Focus SPECIFICALLY on the last 1-2 years
+- Include exact dates when available (e.g., "In March 2025...")
 - Note which developments are confirmed vs. announced/planned
+- **This section is CRITICAL** - prioritize recency over older information
 
-### 5. Challenges and Limitations
+### 7. Challenges and Limitations
 - Technical challenges mentioned by sources
 - Practical implementation barriers
 - Expert skepticism where relevant
 - Knowledge gaps in current research
 
-### 6. Future Directions
+### 8. Future Directions
 - Near-term expectations (1-2 years)
 - Long-term possibilities (5+ years)
 - Distinguish predictions from speculation
 - Note expert disagreements on timelines
 
-### 7. Sources
+### 9. Sources
 Format each source as:
 [1] Author/Publication. "Title" (Year). URL
 
 ## Critical Analysis Guidelines
-1. **Separate proven results from speculation** - Use phrases like "Lab demonstrations show... while commercial applications remain..."
-2. **Include expert skepticism** - If sources disagree, represent both views
-3. **Be specific about evidence** - "A 2024 study found..." vs "Studies suggest..."
-4. **Avoid overgeneralizing** - Don't state things as facts unless sources confirm them
-5. **Note source quality** - Academic papers vs. company announcements vs. news reports
+1. **PRIORITIZE RECENT SOURCES** - Give more weight to 2024-2026 publications
+2. **Be SPECIFIC** - Name companies, products, and exact metrics when available
+3. **Separate proven results from speculation** - "Lab demos show... while commercial use..."
+4. **Include expert skepticism** - If sources disagree, represent both views
+5. **Add comparison tables** where appropriate for clearer understanding
 
 ## Formatting
 - Use Markdown formatting
 - Citations as [1], [2], etc. inline
-- Target length: 2000-3000 words
-- Academic tone but accessible to educated non-specialists
+- Include at least ONE comparison table
+- Target length: 2500-3500 words
+- Academic tone but accessible
 
 Generate the research report now:"""
 
@@ -113,7 +132,7 @@ class SynthesisAgent:
         )
         
         self.prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are a world-class research analyst with expertise in synthesizing complex information and providing critical analysis. You distinguish between established facts, emerging claims, and speculation."),
+            ("system", "You are a world-class research analyst. You prioritize recent information (2024-2026), provide specific examples, and include comparison tables for clarity. You distinguish between established facts and emerging claims."),
             ("human", SYNTHESIS_PROMPT)
         ])
         
@@ -180,7 +199,8 @@ class SynthesisAgent:
         try:
             report = self.chain.invoke({
                 "query": query,
-                "context": context
+                "context": context,
+                "current_year": datetime.now().year
             })
             
             state.draft_report = report
@@ -272,7 +292,8 @@ class SynthesisAgent:
         
         report = self.chain.invoke({
             "query": query,
-            "context": context
+            "context": context,
+            "current_year": datetime.now().year
         })
         
         logger.info(f"Generated report: {len(report)} characters")
