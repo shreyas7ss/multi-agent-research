@@ -2,10 +2,10 @@
 """
 LangGraph Workflow - Orchestrates the multi-agent research pipeline.
 
-Flow:
-    START → Search → Analyzer → Synthesis → Reflection → END
-                                     ↑          │
-                                     └──────────┘ (if needs revision)
+Full Flow:
+    START → Clarification → Search → Analyzer → Synthesis → Reflection → END
+                                                     ↑          │
+                                                     └──────────┘ (if needs revision)
 """
 
 from langgraph.graph import StateGraph, START, END
@@ -15,6 +15,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 from graph.state import ResearchState
+from agents.clarification import ClarificationAgent
 from agents.search import WebSearchAgent
 from agents.analyzer import DocumentAnalyzer
 from agents.synthesis import SynthesisAgent
@@ -26,10 +27,17 @@ logger = get_logger("workflow")
 
 
 # Initialize agents
+clarification_agent = ClarificationAgent()
 search_agent = WebSearchAgent()
 analyzer_agent = DocumentAnalyzer()
 synthesis_agent = SynthesisAgent()
 reflection_agent = ReflectionAgent()
+
+
+def clarification_node(state: ResearchState) -> ResearchState:
+    """Clarification node - refines user query."""
+    logger.info("Executing Clarification Node")
+    return clarification_agent.run(state)
 
 
 def search_node(state: ResearchState) -> ResearchState:
@@ -42,9 +50,7 @@ def analyzer_node(state: ResearchState) -> ResearchState:
     """Analyzer node - downloads, chunks, and stores documents."""
     logger.info("Executing Analyzer Node")
     
-    # Convert sources to the format analyzer expects
     if state.sources and not state.approved_sources:
-        # Auto-approve all sources for now (HITL can be added later)
         state.approved_sources = state.sources
     
     return analyzer_agent.run(state)
@@ -63,9 +69,7 @@ def reflection_node(state: ResearchState) -> ResearchState:
 
 
 def should_revise(state: ResearchState) -> Literal["revise", "end"]:
-    """
-    Conditional edge: decide whether to revise or end.
-    """
+    """Conditional edge: decide whether to revise or end."""
     if state.error:
         logger.warning(f"Workflow ending due to error: {state.error}")
         return "end"
@@ -77,25 +81,34 @@ def should_revise(state: ResearchState) -> Literal["revise", "end"]:
     return "end"
 
 
-def build_research_graph() -> StateGraph:
+def build_research_graph(include_clarification: bool = True) -> StateGraph:
     """
     Build and return the research workflow graph.
     
-    Flow: Search → Analyze → Synthesize → Reflect → (Revise or End)
+    Args:
+        include_clarification: Whether to include the clarification step
+        
+    Flow: Clarification → Search → Analyze → Synthesize → Reflect → (Revise or End)
     """
     logger.info("Building research workflow graph")
     
-    # Create the graph with our state schema
     graph = StateGraph(ResearchState)
     
     # Add nodes
+    if include_clarification:
+        graph.add_node("clarification", clarification_node)
     graph.add_node("search", search_node)
     graph.add_node("analyzer", analyzer_node)
     graph.add_node("synthesis", synthesis_node)
     graph.add_node("reflection", reflection_node)
     
     # Add edges
-    graph.add_edge(START, "search")
+    if include_clarification:
+        graph.add_edge(START, "clarification")
+        graph.add_edge("clarification", "search")
+    else:
+        graph.add_edge(START, "search")
+    
     graph.add_edge("search", "analyzer")
     graph.add_edge("analyzer", "synthesis")
     graph.add_edge("synthesis", "reflection")
@@ -105,26 +118,27 @@ def build_research_graph() -> StateGraph:
         "reflection",
         should_revise,
         {
-            "revise": "synthesis",  # Go back to synthesis with feedback
+            "revise": "synthesis",
             "end": END
         }
     )
     
-    logger.info("Research graph built with reflection loop")
+    logger.info("Research graph built with all agents")
     return graph
 
 
-def create_research_app(checkpointer=None):
+def create_research_app(checkpointer=None, include_clarification: bool = True):
     """
     Create and compile the research application.
     
     Args:
         checkpointer: Optional memory saver for conversation persistence
+        include_clarification: Whether to include clarification step
         
     Returns:
         Compiled LangGraph application
     """
-    graph = build_research_graph()
+    graph = build_research_graph(include_clarification=include_clarification)
     
     if checkpointer is None:
         checkpointer = MemorySaver()
@@ -135,27 +149,35 @@ def create_research_app(checkpointer=None):
     return app
 
 
-def run_research(query: str, thread_id: str = "default") -> ResearchState:
+def run_research(
+    query: str, 
+    thread_id: str = "default",
+    skip_clarification: bool = False
+) -> ResearchState:
     """
     Run the complete research pipeline.
     
     Args:
         query: The research question
         thread_id: Unique thread ID for conversation memory
+        skip_clarification: Set True to skip clarification step
         
     Returns:
         Final ResearchState with the generated report
     """
+    mode = "with clarification" if not skip_clarification else "skip clarification"
+    
     console.print(Panel.fit(
         f"[bold blue]🔬 Multi-Agent Research Assistant[/bold blue]\n\n"
-        f"[cyan]Query:[/cyan] {query}",
+        f"[cyan]Query:[/cyan] {query}\n"
+        f"[dim]Mode: {mode}[/dim]",
         title="Starting Research"
     ))
     
     logger.info(f"Starting research for query: {query}")
     
     # Create the app
-    app = create_research_app()
+    app = create_research_app(include_clarification=not skip_clarification)
     
     # Initial state
     initial_state = ResearchState(original_query=query)
@@ -163,7 +185,6 @@ def run_research(query: str, thread_id: str = "default") -> ResearchState:
     # Config for this thread
     config = {"configurable": {"thread_id": thread_id}}
     
-    # Run the graph
     console.print("\n[bold]Running research pipeline...[/bold]\n")
     
     try:
@@ -183,10 +204,13 @@ def run_research(query: str, thread_id: str = "default") -> ResearchState:
         console.print(f"⭐ Quality score: {final_state.quality_score}/10")
         console.print(f"🔄 Iterations: {final_state.iteration_count}")
         
+        if final_state.refined_query and final_state.refined_query != query:
+            console.print(f"✨ Refined query: {final_state.refined_query}")
+        
         if final_state.error:
             console.print(f"[red]⚠️ Error: {final_state.error}[/red]")
         
-        logger.info(f"Research complete. Score: {final_state.quality_score}, Iterations: {final_state.iteration_count}")
+        logger.info(f"Research complete. Score: {final_state.quality_score}")
         
         return final_state
         
@@ -197,13 +221,12 @@ def run_research(query: str, thread_id: str = "default") -> ResearchState:
 
 
 def get_graph_visualization():
-    """
-    Get a Mermaid diagram representation of the graph.
-    """
+    """Get a Mermaid diagram representation of the graph."""
     return """
 ```mermaid
 graph TD
-    START((Start)) --> search[🔍 Search Agent]
+    START((Start)) --> clarification[💬 Clarification]
+    clarification --> search[🔍 Search Agent]
     search --> analyzer[📄 Analyzer Agent]
     analyzer --> synthesis[📝 Synthesis Agent]
     synthesis --> reflection[🔍 Reflection Agent]
@@ -216,9 +239,9 @@ graph TD
 # Expose the main app
 research_app = None
 
-def get_research_app():
+def get_research_app(include_clarification: bool = True):
     """Get or create the research app singleton."""
     global research_app
     if research_app is None:
-        research_app = create_research_app()
+        research_app = create_research_app(include_clarification=include_clarification)
     return research_app
