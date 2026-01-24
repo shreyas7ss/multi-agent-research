@@ -257,7 +257,59 @@ class ClarificationAgent:
         refined = self._refine_query(query, questions, responses)
         
         return (refined, questions, responses)
+    
+    def analyze_query_api(self, query: str) -> dict:
+        """
+        API-friendly method: Analyze query and return clarification info.
+        Does NOT require interactive input.
+        
+        Returns:
+            {
+                "needs_clarification": bool,
+                "analysis": str,
+                "questions": List[str],
+                "suggested_refined_query": str
+            }
+        """
+        logger.info(f"API clarification analysis for: {query[:50]}...")
+        
+        analysis = self._analyze_query(query)
+        
+        if not analysis:
+            return {
+                "needs_clarification": False,
+                "analysis": "Unable to analyze query",
+                "questions": [],
+                "suggested_refined_query": query
+            }
+        
+        return {
+            "needs_clarification": analysis.get("needs_clarification", False),
+            "analysis": analysis.get("analysis", ""),
+            "questions": analysis.get("questions", []),
+            "suggested_refined_query": analysis.get("suggested_refined_query", query)
+        }
+    
+    def refine_query_api(self, original_query: str, questions: List[str], responses: List[str]) -> str:
+        """
+        API-friendly method: Refine query based on user's answers.
+        
+        Args:
+            original_query: The original user query
+            questions: List of clarification questions that were asked
+            responses: List of user's answers to those questions
+            
+        Returns:
+            Refined query string
+        """
+        logger.info(f"API query refinement for: {original_query[:50]}...")
+        
+        if not questions or not responses:
+            return original_query
+        
+        return self._refine_query(original_query, questions, responses)
 
 
 # Singleton instance
 clarification_agent = ClarificationAgent()
+

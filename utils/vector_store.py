@@ -51,8 +51,9 @@ class VectorStore:
                 api_key=settings.qdrant_api_key
             )
         else:
-            logger.info(f"Using local Qdrant storage: {self.storage_path}")
-            self.client = QdrantClient(path=self.storage_path)
+            # Use in-memory mode to avoid file lock issues with multiple processes
+            logger.info("Using in-memory Qdrant storage")
+            self.client = QdrantClient(":memory:")
         
         # Ensure collection exists
         self._initialize_collection()
