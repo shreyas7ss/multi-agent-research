@@ -1,4 +1,5 @@
 # utils/config.py
+import os
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -42,7 +43,15 @@ class Settings(BaseSettings):
         env_file = ".env"
         case_sensitive = False
 
+
 @lru_cache()
 def get_settings():
     """Get cached settings instance"""
-    return Settings()
+    settings = Settings()
+    
+    # Set LangSmith environment variables so LangChain can detect them
+    os.environ["LANGCHAIN_API_KEY"] = settings.langchain_api_key
+    os.environ["LANGCHAIN_TRACING_V2"] = str(settings.langchain_tracing_v2).lower()
+    os.environ["LANGCHAIN_PROJECT"] = settings.langchain_project
+    
+    return settings

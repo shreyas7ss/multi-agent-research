@@ -7,10 +7,11 @@ Run with: streamlit run ui/app.py
 import streamlit as st
 import requests
 import time
+import os
 from typing import Optional
 
-# API Configuration
-API_BASE = "http://localhost:8000"
+# API Configuration - uses environment variable for Render, defaults to localhost for local dev
+API_BASE = os.environ.get("API_URL", "http://localhost:8000")
 
 # Page config
 st.set_page_config(

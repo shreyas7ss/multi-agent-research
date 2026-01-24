@@ -1,0 +1,56 @@
+# ============================================
+# MONOLITH DOCKERFILE FOR RENDER DEPLOYMENT
+# Runs both FastAPI (backend) and Streamlit (frontend) 
+# ============================================
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies (for supervisord)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    supervisor \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install CPU-only PyTorch first to reduce image size and avoid CUDA issues
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+# Install Python dependencies
+COPY requirments.txt .
+RUN pip install --no-cache-dir -r requirments.txt
+
+# Set API URL for Streamlit to connect to internal FastAPI
+ENV API_URL="http://127.0.0.1:8000"
+
+# Copy application code
+COPY . .
+
+# Create supervisord config to run both services
+RUN echo '[supervisord]\n\
+nodaemon=true\n\
+logfile=/dev/stdout\n\
+logfile_maxbytes=0\n\
+\n\
+[program:api]\n\
+command=uvicorn api.main:app --host 0.0.0.0 --port 8000\n\
+autostart=true\n\
+autorestart=true\n\
+stdout_logfile=/dev/stdout\n\
+stdout_logfile_maxbytes=0\n\
+stderr_logfile=/dev/stderr\n\
+stderr_logfile_maxbytes=0\n\
+\n\
+[program:streamlit]\n\
+command=streamlit run ui/app.py --server.port 10000 --server.address 0.0.0.0 --server.headless true\n\
+autostart=true\n\
+autorestart=true\n\
+stdout_logfile=/dev/stdout\n\
+stdout_logfile_maxbytes=0\n\
+stderr_logfile=/dev/stderr\n\
+stderr_logfile_maxbytes=0\n' > /etc/supervisor/conf.d/services.conf
+
+# Render uses port 10000 by default for free tier
+EXPOSE 10000
+
+# Start supervisord which manages both services
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/services.conf"]
