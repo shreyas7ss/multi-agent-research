@@ -60,7 +60,9 @@ A PhD-level autonomous research assistant powered by multiple AI agents working 
 | **UI** | Streamlit |
 | **Package Manager** | UV |
 | **Terminal Output** | Rich |
-| **Monitoring** | LangSmith |
+| **Monitoring & Tracing** | LangSmith |
+| **Containerization** | Docker |
+| **Deployment** | Render |
 
 ---
 
@@ -215,9 +217,9 @@ pytest tests/ --cov=agents --cov=graph --cov=utils
 ## 📝 Development Roadmap
 
 - [x] Week 1: Setup infrastructure, implement basic agents, test vector database
-- [ ] Week 2: Build LangGraph workflow, integrate all agents, add basic UI
-- [ ] Week 3: Implement HITL features, add quality checks, testing
-- [ ] Week 4: Polish UI, create documentation, record demo, deploy
+- [x] Week 2: Build LangGraph workflow, integrate all agents, add basic UI
+- [x] Week 3: Implement HITL features, add quality checks, testing
+- [x] Week 4: Polish UI, create documentation, containerize with Docker, deploy to Render
 
 ---
 
